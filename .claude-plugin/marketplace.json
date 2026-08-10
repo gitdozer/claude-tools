@@ -1,0 +1,20 @@
+{
+  "name": "claude-tools",
+  "owner": {
+    "name": "GitDozer"
+  },
+  "metadata": {
+    "description": "Skill e plugin personali per Claude Code",
+  },
+  "plugins": [
+    {
+      "name": "commit-desc",
+      "description": "Proposes a Conventional Commits message for the staged git diff, using Haiku in an isolated context to stay fast and cheap.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/commit-desc"
+      ]
+    }
+  ]
+}
