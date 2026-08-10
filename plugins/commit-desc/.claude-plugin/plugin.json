@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "commit-desc",
+  "version": "0.1.0",
+  "description": "Proposes a Conventional Commits message for the staged git diff, using Haiku in an isolated context to stay fast and cheap.",
+  "author": {
+    "name": "GitDozer"
+  },
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "commit",
+    "conventional-commits"
+  ]
+}
