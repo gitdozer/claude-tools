@@ -56,17 +56,16 @@ git diff --cached --numstat -M 2>/dev/null | awk -F'\t' '{
 }'
 
 echo "DIFF (context=$CTX; lock files, build output, data files and binaries are listed above but not diffed):"
+# Exclusion list kept byte-identical to SKILL.md and measure_history.{sh,ps1}.
+# Those two measure what the skill really sends, so any drift here silently makes
+# their numbers wrong. Note that '*' crosses '/' in a git pathspec, so '*.lock'
+# already covers yarn.lock, Cargo.lock and friends at any depth -- but not
+# pnpm-lock.yaml, which is why that one is listed explicitly.
 git diff --cached -M "-U$CTX" --no-color --no-ext-diff --diff-algorithm=minimal -- . \
   ':(exclude)*.lock' \
   ':(exclude)*-lock.json' \
   ':(exclude)*.lockb' \
-  ':(exclude)yarn.lock' \
   ':(exclude)pnpm-lock.yaml' \
-  ':(exclude)poetry.lock' \
-  ':(exclude)uv.lock' \
-  ':(exclude)Pipfile.lock' \
-  ':(exclude)Cargo.lock' \
-  ':(exclude)composer.lock' \
   ':(exclude)*.min.js' \
   ':(exclude)*.min.css' \
   ':(exclude)*.map' \
@@ -76,7 +75,9 @@ git diff --cached -M "-U$CTX" --no-color --no-ext-diff --diff-algorithm=minimal 
   ':(exclude)*.tsv' \
   ':(exclude)*.parquet' \
   ':(exclude)*.xlsx' \
+  ':(exclude)*.geojson' \
   ':(exclude)*.pdf' \
+  ':(exclude)*.svg' \
   ':(exclude)*.png' \
   ':(exclude)*.jpg' \
   ':(exclude)*.jpeg' \

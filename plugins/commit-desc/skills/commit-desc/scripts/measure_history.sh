@@ -34,6 +34,7 @@ set -- \
   ':(exclude)*.lock' \
   ':(exclude)*-lock.json' \
   ':(exclude)*.lockb' \
+  ':(exclude)pnpm-lock.yaml' \
   ':(exclude)*.min.js' \
   ':(exclude)*.min.css' \
   ':(exclude)*.map' \
@@ -43,16 +44,22 @@ set -- \
   ':(exclude)*.tsv' \
   ':(exclude)*.parquet' \
   ':(exclude)*.xlsx' \
+  ':(exclude)*.geojson' \
   ':(exclude)*.pdf' \
+  ':(exclude)*.svg' \
   ':(exclude)*.png' \
   ':(exclude)*.jpg' \
+  ':(exclude)*.jpeg' \
   ':(exclude)*.gif' \
+  ':(exclude)*.ico' \
   ':(exclude)*.pkl' \
   ':(exclude)*.h5' \
+  ':(exclude)*.onnx' \
   ':(exclude)*.zip' \
   ':(exclude)dist/*' \
   ':(exclude)*/dist/*' \
   ':(exclude)build/*' \
+  ':(exclude)*/build/*' \
   ':(exclude)node_modules/*'
 
 TMP=$(mktemp) || exit 1
