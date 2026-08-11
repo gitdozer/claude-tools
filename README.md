@@ -9,12 +9,12 @@ una cartella e una voce in `marketplace.json`, non un nuovo repository.
 ## Installazione
 
 ```bash
-claude plugin marketplace add <owner>/<repo>
+claude plugin marketplace add gitdozer/claude-tools
 claude plugin install commit-desc@claude-tools
 ```
 
-Finché il repo non è su GitHub, `add` accetta anche il percorso locale della
-cartella che contiene `.claude-plugin/`.
+`add` accetta anche il percorso locale della cartella che contiene
+`.claude-plugin/`, comodo per provare una modifica prima di pubblicarla.
 
 ## Cosa c'è
 
@@ -96,22 +96,22 @@ o zip `.skill`. Il repo le tiene solo versionate. Dettagli nel
    `{ "name": "nome-plugin", "source": "./plugins/nome-plugin" }`.
 3. Aggiungi la riga nella tabella *Cosa c'è*.
 
-## Pubblicare su GitHub
+## Pubblicare una modifica
 
-Il repository si chiama `claude-tools`. Il nome della cartella locale è
-indipendente e resta `plugin-commit-description`: chi clona il repo se lo trova
-in una cartella `claude-tools`, e git non nota la differenza.
+Il repository è pubblicato su
+[github.com/gitdozer/claude-tools](https://github.com/gitdozer/claude-tools).
+Da qui in avanti pubblicare è il normale ciclo git:
 
 ```bash
-git init
 git add .
-git commit -m "chore: initial commit"
-git branch -M main
-git remote add origin https://github.com/<owner>/claude-tools.git
-git push -u origin main
+git commit -m "..."
+git push
 ```
 
-Il terzo nome in gioco è il campo `name` di `marketplace.json`, allineato a
-`claude-tools`: è l'identificatore che si digita dopo la chiocciola, come in
-`claude plugin install commit-desc@claude-tools`. Se un domani rinomini il
-repository, conviene aggiornare anche quello.
+Tre nomi entrano in gioco, e sono indipendenti fra loro. Il repository si chiama
+`claude-tools` come la cartella locale, ma chi clona il repo può tenerlo in una
+cartella con qualunque nome e git non nota la differenza. Il terzo è il campo
+`name` di `marketplace.json`, allineato anch'esso a `claude-tools`: è
+l'identificatore che si digita dopo la chiocciola, come in `claude plugin
+install commit-desc@claude-tools`. Se un domani rinomini il repository, conviene
+aggiornare anche quello.

@@ -76,14 +76,14 @@ indipendente senza modificare nulla.
 Dalla radice del repo che contiene `.claude-plugin/marketplace.json`:
 
 ```bash
-claude plugin marketplace add "C:/percorso/di/plugin-commit-description"
+claude plugin marketplace add "C:/percorso/di/claude-tools"
 claude plugin install commit-desc@claude-tools
 ```
 
-Dopo la pubblicazione su GitHub basta cambiare l'`add`:
+Il repo è pubblicato, quindi basta cambiare l'`add`:
 
 ```bash
-claude plugin marketplace add <owner>/<repo>
+claude plugin marketplace add gitdozer/claude-tools
 claude plugin install commit-desc@claude-tools
 ```
 
@@ -153,18 +153,18 @@ serve necessariamente voler cambiare il tetto (`head -c 12000`) per usarlo.
 Lo script va lanciato **dalla cartella del repository da misurare**, indicando
 il percorso completo dello script (che vive qui, non nel repository misurato).
 
-Dalla cartella sorgente del plugin, da PowerShell:
+Con il plugin come sorgente (questo repository), da PowerShell:
 
 ```powershell
 cd C:\percorso\del\repo
-& "C:\percorso\di\plugin-commit-description\plugins\commit-desc\skills\commit-desc\scripts\measure_history.ps1" -Count 200
+& "C:\percorso\di\claude-tools\plugins\commit-desc\skills\commit-desc\scripts\measure_history.ps1" -Count 200
 ```
 
 Da Git Bash o da qualsiasi shell POSIX:
 
 ```bash
 cd /percorso/del/repo
-sh "/c/percorso/di/plugin-commit-description/plugins/commit-desc/skills/commit-desc/scripts/measure_history.sh" 200
+sh "/c/percorso/di/claude-tools/plugins/commit-desc/skills/commit-desc/scripts/measure_history.sh" 200
 ```
 
 Se hai installato con l'Opzione B (copia in `~/.claude/skills/commit-desc`), il

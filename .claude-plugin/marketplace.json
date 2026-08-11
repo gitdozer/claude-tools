@@ -3,7 +3,7 @@
   "name": "claude-tools",
   "description": "Skill e plugin personali per Claude Code",
   "owner": {
-    "name": "GitDozer"
+    "name": "Dennis Maffei"
   },
   "plugins": [
     {

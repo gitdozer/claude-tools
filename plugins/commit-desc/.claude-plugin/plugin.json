@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Proposes a Conventional Commits message for the staged git diff, using Haiku in an isolated context to stay fast and cheap.",
   "author": {
-    "name": "GitDozer"
+    "name": "Dennis Maffei"
   },
   "license": "MIT",
   "keywords": [
