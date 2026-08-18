@@ -2,39 +2,39 @@
 
 <#
 .SYNOPSIS
-    Misura, sulla storia reale del repository corrente, quanti byte il
-    comando /commit-desc avrebbe inviato al modello per ogni commit passato.
+    Measures, on the real history of the current repository, how many bytes the
+    /commit-desc command would have sent to the model for each past commit.
 
 .DESCRIPTION
-    Versione PowerShell di measure_history.sh, per non dipendere da Git Bash.
-    Serve a tarare il tetto di caratteri (head -c) usato in SKILL.md sui propri
-    commit invece che a intuito.
+    PowerShell version of measure_history.sh, so Git Bash is not required.
+    Use it to tune the character cap (head -c) used in SKILL.md against your own
+    commits instead of guessing.
 
-    Per ogni commit non-merge riporta due misure:
-      Grezzi  il diff completo, senza esclusioni, contesto standard
-      Inviati cio che /commit-desc invierebbe davvero: contesto ridotto e
-              file di rumore esclusi, prima che il tetto venga applicato
+    For every non-merge commit it reports two measurements:
+      Raw   the complete diff, no exclusions, default context
+      Sent  what /commit-desc would really send: reduced context and noise files
+            excluded, before the cap is applied
 
-    L'unita' di misura sono i byte, la stessa di `head -c` in SKILL.md e di
-    `wc -c` in measure_history.sh, cosi' i numeri delle due versioni coincidono
-    anche su testo accentato o con fine riga CRLF.
+    The unit is the byte, the same as `head -c` in SKILL.md and `wc -c` in
+    measure_history.sh, so the numbers of the two versions agree even on accented
+    text or with CRLF line endings.
 
-    I merge sono esclusi: `git show` non stampa un diff per i merge, quindi
-    risulterebbero a zero e falserebbero le statistiche.
+    Merges are excluded: `git show` prints no diff for a merge, so they would show
+    up as zero and distort the statistics.
 
-    Se git fallisce su un commit, quel commit viene elencato ed escluso dalle
-    statistiche invece di essere contato come zero: uno zero silenzioso
-    abbasserebbe mediana e percentili dando numeri plausibili ma sbagliati,
-    proprio quelli su cui si decide il tetto.
+    If git fails on a commit, that commit is listed and left out of the statistics
+    instead of counting as zero: a silent zero would drag the median and the
+    percentiles down, producing plausible but wrong numbers - exactly the numbers
+    the cap is decided from.
 
 .PARAMETER Count
-    Quanti commit analizzare, a partire da HEAD. Default 100.
+    How many commits to analyse, starting from HEAD. Default 100.
 
 .PARAMETER Cap
-    Il tetto con cui confrontare le misure. Default 12000, come in SKILL.md.
+    The cap to compare the measurements against. Default 12000, as in SKILL.md.
 
 .PARAMETER ContextLines
-    Righe di contesto usate per la misura "Inviati". Default 2, come in SKILL.md.
+    Context lines used for the "Sent" measurement. Default 2, as in SKILL.md.
 
 .EXAMPLE
     .\measure_history.ps1 200
@@ -51,34 +51,43 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Numbers are formatted with the invariant culture on purpose: PowerShell's `N0`
+# follows the machine's locale, so on a non-English Windows the same value would
+# print as 12.000 here and 12,000 in measure_history.sh. Forcing the culture keeps
+# the two versions comparable line by line.
+function Format-Number {
+    param([double]$Value)
+    return $Value.ToString('N0', [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    Write-Host "ERRORE: git non e' disponibile nel PATH." -ForegroundColor Red
+    Write-Host "ERROR: git is not available in PATH." -ForegroundColor Red
     exit 1
 }
 
-# Ogni invocazione di git passa dalle due funzioni qui sotto, che avviano il
-# processo direttamente invece di usare `& git ... 2>$null`. Tre motivi, tutti
-# verificati su PowerShell 5.1:
+# Every git invocation goes through the two functions below, which start the
+# process directly instead of using `& git ... 2>$null`. Three reasons, all
+# verified on PowerShell 5.1:
 #
-#   1. Redirigere lo stderr di un eseguibile nativo incapsula ogni riga in un
-#      ErrorRecord; con $ErrorActionPreference = 'Stop' quell'errore diventa
-#      TERMINANTE. Un git fallito uccideva lo script con una NativeCommandError
-#      prima di raggiungere i controlli scritti per gestirlo -- compreso quello
-#      che stampa "questa cartella non e' un repository git".
-#   2. Senza guardare il codice di uscita, un git fallito era indistinguibile da
-#      un diff vuoto e finiva nelle statistiche come zero.
-#   3. `git | ForEach-Object` conta caratteri decodificati, non byte: accenti e
-#      CRLF facevano divergere i numeri da quelli di measure_history.sh.
+#   1. Redirecting a native executable's stderr wraps every line in an
+#      ErrorRecord; with $ErrorActionPreference = 'Stop' that error becomes
+#      TERMINATING. A failing git killed the script with a NativeCommandError
+#      before reaching the checks written to handle it -- including the one that
+#      prints "this folder is not a git repository".
+#   2. Without looking at the exit code, a failing git was indistinguishable from
+#      an empty diff and ended up in the statistics as a zero.
+#   3. `git | ForEach-Object` counts decoded characters, not bytes: accents and
+#      CRLF made the numbers diverge from those of measure_history.sh.
 #
-# Leggere il BaseStream del processo risolve tutti e tre: byte veri, ExitCode
-# affidabile, e il flusso degli errori di PowerShell mai coinvolto.
+# Reading the process's BaseStream solves all three: real bytes, a reliable
+# ExitCode, and PowerShell's error stream never involved.
 
 function New-GitStartInfo {
     param([string[]]$Arguments)
 
-    # Gli argomenti usati qui non contengono spazi (sha esadecimali e pathspec
-    # letterali), ma la quotatura resta per non rendere fragile una modifica
-    # futura.
+    # The arguments used here contain no spaces (hexadecimal shas and literal
+    # pathspecs), but the quoting stays so that a future change does not make this
+    # fragile.
     $quoted = $Arguments | ForEach-Object {
         if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
     }
@@ -90,10 +99,10 @@ function New-GitStartInfo {
     $psi.CreateNoWindow = $true
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
-    # Obbligatorio: un processo avviato cosi' erediterebbe la directory corrente
-    # di .NET, che non segue Set-Location. Senza questa riga git girerebbe in
-    # un'altra cartella, il pathspec '.' taglierebbe il diff e lo script
-    # misurerebbe il repository sbagliato senza dirlo.
+    # Mandatory: a process started this way would inherit .NET's current
+    # directory, which does not follow Set-Location. Without this line git would
+    # run in another folder, the '.' pathspec would cut the diff, and the script
+    # would measure the wrong repository without saying so.
     $psi.WorkingDirectory = (Get-Location -PSProvider FileSystem).ProviderPath
     return $psi
 }
@@ -103,8 +112,8 @@ function Measure-GitOutputBytes {
 
     $psi = New-GitStartInfo -Arguments $Arguments
     $process = [System.Diagnostics.Process]::Start($psi)
-    # Lo stderr va svuotato in parallelo: se git ne scrivesse piu' di quanto
-    # entra nel buffer della pipe, il processo resterebbe bloccato.
+    # stderr must be drained in parallel: if git wrote more of it than fits in the
+    # pipe buffer, the process would block.
     $stderrTask = $process.StandardError.ReadToEndAsync()
 
     $stream = $process.StandardOutput.BaseStream
@@ -136,18 +145,18 @@ function Get-GitLines {
     $process.Dispose()
 
     if ($exitCode -ne 0) { return $null }
-    # PowerShell srotola un array di un solo elemento in una stringa quando lo
-    # restituisce una funzione, e [0] su una stringa da' il primo carattere: per
-    # questo chi chiama racchiude sempre il risultato in @(...).
+    # PowerShell unrolls a single-element array into a string when a function
+    # returns it, and [0] on a string gives the first character: that is why every
+    # call site wraps the result in @(...).
     return @($out -split '\r?\n' | Where-Object { $_ -ne '' })
 }
 
 if ($null -eq (Get-GitLines -Arguments @('rev-parse', '--is-inside-work-tree'))) {
-    Write-Host "ERRORE: questa cartella non e' un repository git." -ForegroundColor Red
+    Write-Host "ERROR: this folder is not a git repository." -ForegroundColor Red
     exit 1
 }
 
-# La stessa lista di esclusioni usata da SKILL.md.
+# The same exclusion list used by SKILL.md.
 $excludes = @(
     ':(exclude)*.lock'
     ':(exclude)*-lock.json'
@@ -183,7 +192,7 @@ $excludes = @(
 
 $shas = @(Get-GitLines -Arguments @('log', '-n', "$Count", '--no-merges', '--pretty=%H'))
 if ($shas.Count -eq 0) {
-    Write-Host "Nessun commit non-merge trovato."
+    Write-Host "No non-merge commits found."
     exit 0
 }
 
@@ -192,7 +201,7 @@ $failed = New-Object System.Collections.Generic.List[object]
 $i = 0
 foreach ($sha in $shas) {
     $i++
-    Write-Progress -Activity "Analisi dei commit" -Status "$i di $($shas.Count)" -PercentComplete (100 * $i / $shas.Count)
+    Write-Progress -Activity "Analysing commits" -Status "$i of $($shas.Count)" -PercentComplete (100 * $i / $shas.Count)
 
     $rawArgs = @('show', '--no-color', '--no-ext-diff', '--format=', '-M', $sha)
     $sentArgs = @('show', '--no-color', '--no-ext-diff', '--diff-algorithm=minimal', "-U$ContextLines", '--format=', '-M', $sha, '--', '.') + $excludes
@@ -215,10 +224,10 @@ foreach ($sha in $shas) {
         Subject = $subject
     })
 }
-Write-Progress -Activity "Analisi dei commit" -Completed
+Write-Progress -Activity "Analysing commits" -Completed
 
 if ($rows.Count -eq 0) {
-    Write-Host ("ERRORE: git non ha prodotto un diff misurabile per nessuno dei {0} commit analizzati." -f $shas.Count) -ForegroundColor Red
+    Write-Host ("ERROR: git produced no measurable diff for any of the {0} commits analysed." -f $shas.Count) -ForegroundColor Red
     exit 1
 }
 
@@ -237,18 +246,18 @@ $saved = 0
 if ($rawSum -gt 0) { $saved = 100 * ($rawSum - $sentSum) / $rawSum }
 
 Write-Host ""
-Write-Host ("Commit analizzati: {0} (merge esclusi)   tetto: {1:N0} caratteri   contesto: {2} righe" -f $n, $Cap, $ContextLines)
+Write-Host ("Commits analysed: {0} (merges excluded)   cap: {1} characters   context: {2} lines" -f $n, (Format-Number $Cap), $ContextLines)
 Write-Host ""
-Write-Host "Caratteri inviati al modello (dopo le esclusioni, prima del tetto):"
-Write-Host ("  mediana        {0,10:N0}" -f $median)
-Write-Host ("  90 percentile  {0,10:N0}" -f $p90)
-Write-Host ("  massimo        {0,10:N0}" -f $max)
-Write-Host ("  oltre il tetto: {0} su {1} ({2:N0}%)" -f $over, $n, (100 * $over / $n))
+Write-Host "Characters sent to the model (after exclusions, before the cap):"
+Write-Host ("  median         {0,10}" -f (Format-Number $median))
+Write-Host ("  90th percentile{0,10}" -f (Format-Number $p90))
+Write-Host ("  maximum        {0,10}" -f (Format-Number $max))
+Write-Host ("  over the cap: {0} of {1} ({2}%)" -f $over, $n, (Format-Number ([math]::Round(100 * $over / $n))))
 Write-Host ""
-Write-Host ("Effetto di esclusioni e contesto ridotto: da {0:N0} a {1:N0} caratteri totali (-{2:N0}%)" -f $rawSum, $sentSum, $saved)
+Write-Host ("Effect of exclusions and reduced context: from {0} to {1} total characters (-{2}%)" -f (Format-Number $rawSum), (Format-Number $sentSum), (Format-Number ([math]::Round($saved))))
 Write-Host ""
-Write-Host "I commit piu' grandi:"
-Write-Host ("  {0,10} {1,10}  {2,-8}  {3}" -f 'inviati', 'grezzi', 'sha', 'oggetto')
+Write-Host "The largest commits:"
+Write-Host ("  {0,10}  {1,10}  {2,8}  {3}" -f 'sent', 'raw', 'sha', 'subject')
 
 $top = @($sorted[[math]::Max(0, $n - 10)..($n - 1)])
 [array]::Reverse($top)
@@ -257,17 +266,17 @@ foreach ($r in $top) {
     if ($r.Sent -gt $Cap) { $flag = ' *' }
     $subject = $r.Subject
     if ($subject.Length -gt 60) { $subject = $subject.Substring(0, 60) }
-    Write-Host ("{0}{1,10:N0} {2,10:N0}  {3,-8}  {4}" -f $flag, $r.Sent, $r.Raw, $r.Sha, $subject)
+    Write-Host ("{0}{1,10}  {2,10}  {3,8}  {4}" -f $flag, (Format-Number $r.Sent), (Format-Number $r.Raw), $r.Sha, $subject)
 }
 
 if ($over -gt 0) {
     Write-Host ""
-    Write-Host "* superano il tetto: il diff sarebbe stato troncato."
+    Write-Host "* over the cap: the diff would have been truncated."
 }
 
 if ($failed.Count -gt 0) {
     Write-Host ""
-    Write-Host ("ATTENZIONE: git non ha prodotto un diff misurabile per {0} commit su {1}. Sono esclusi dalle statistiche qui sopra:" -f $failed.Count, $shas.Count) -ForegroundColor Yellow
+    Write-Host ("WARNING: git produced no measurable diff for {0} of {1} commits. They are excluded from the statistics above:" -f $failed.Count, $shas.Count) -ForegroundColor Yellow
     foreach ($f in $failed) {
         Write-Host ("  {0}  {1}" -f $f.Sha, $f.Subject)
     }

@@ -106,33 +106,33 @@ if [ ! -s "$OK" ]; then
 fi
 
 sort -t"$(printf '\t')" -k2,2n "$OK" | awk -F'\t' -v cap="$CAP" -v ctx="$CTX" '
-function fmt(x) { s = sprintf("%d", x + 0); out = ""; while (length(s) > 3) { out = "." substr(s, length(s) - 2) out; s = substr(s, 1, length(s) - 3) } return s out }
+function fmt(x) { s = sprintf("%d", x + 0); out = ""; while (length(s) > 3) { out = "," substr(s, length(s) - 2) out; s = substr(s, 1, length(s) - 3) } return s out }
 { raw[NR] = $1; sent[NR] = $2; sha[NR] = $3; subj[NR] = $4; rawsum += $1; sentsum += $2; if ($2 > cap) over++ }
 END {
   n = NR
   med = sent[int((n + 1) / 2)]
   p90 = sent[int(n * 0.9) < 1 ? 1 : int(n * 0.9)]
   max = sent[n]
-  printf "Commit analizzati: %d (merge esclusi)   tetto: %s caratteri   contesto: %s righe\n\n", n, fmt(cap), ctx
-  printf "Caratteri inviati al modello (dopo le esclusioni, prima del tetto):\n"
-  printf "  mediana      %10s\n", fmt(med)
-  printf "  90 percentile%10s\n", fmt(p90)
-  printf "  massimo      %10s\n", fmt(max)
-  printf "  oltre il tetto: %d su %d (%.0f%%)\n\n", over + 0, n, (over + 0) * 100 / n
+  printf "Commits analysed: %d (merges excluded)   cap: %s characters   context: %s lines\n\n", n, fmt(cap), ctx
+  printf "Characters sent to the model (after exclusions, before the cap):\n"
+  printf "  median         %10s\n", fmt(med)
+  printf "  90th percentile%10s\n", fmt(p90)
+  printf "  maximum        %10s\n", fmt(max)
+  printf "  over the cap: %d of %d (%.0f%%)\n\n", over + 0, n, (over + 0) * 100 / n
   saved = (rawsum > 0) ? (rawsum - sentsum) * 100 / rawsum : 0
-  printf "Effetto di esclusioni e contesto ridotto: da %s a %s caratteri totali (-%.0f%%)\n\n", fmt(rawsum), fmt(sentsum), saved
-  printf "I commit piu grandi:\n"
-  printf "  %10s  %10s  %8s  %s\n", "inviati", "grezzi", "sha", "oggetto"
+  printf "Effect of exclusions and reduced context: from %s to %s total characters (-%.0f%%)\n\n", fmt(rawsum), fmt(sentsum), saved
+  printf "The largest commits:\n"
+  printf "  %10s  %10s  %8s  %s\n", "sent", "raw", "sha", "subject"
   start = n - 9; if (start < 1) start = 1
   for (i = n; i >= start; i--) {
     flag = sent[i] > cap ? " *" : "  "
     printf "%s%10s  %10s  %8s  %s\n", flag, fmt(sent[i]), fmt(raw[i]), sha[i], substr(subj[i], 1, 60)
   }
-  if (over > 0) printf "\n* superano il tetto: il diff sarebbe stato troncato.\n"
+  if (over > 0) printf "\n* over the cap: the diff would have been truncated.\n"
 }
 '
 
 if [ "$nfail" -gt 0 ]; then
-  printf '\nATTENZIONE: git non ha prodotto un diff misurabile per %s commit. Sono esclusi dalle statistiche qui sopra:\n' "$nfail"
+  printf '\nWARNING: git produced no measurable diff for %s commits. They are excluded from the statistics above:\n' "$nfail"
   awk -F'\t' '!($1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/) { printf "  %s  %s\n", $3, $4 }' "$TMP"
 fi

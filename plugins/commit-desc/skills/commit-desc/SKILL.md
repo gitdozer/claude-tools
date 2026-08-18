@@ -74,7 +74,7 @@ SIZE is greater than 12000, the diff you received is incomplete, and the very
 first line of your reply must be exactly this, with the real number in place of
 N and no other comment:
 
-    ATTENZIONE: diff troncato, inviati 12.000 caratteri su N. Il messaggio si basa su una parte delle modifiche.
+    WARNING: diff truncated, 12,000 characters sent out of N. The message is based on part of the changes.
 
 If DIFF SIZE is 12000 or less, do not mention truncation at all.
 
