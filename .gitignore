@@ -5,3 +5,6 @@ Thumbs.db
 node_modules/
 __pycache__/
 *.pyc
+
+# Ignore CLAUDE.md
+CLAUDE.md
