@@ -1,117 +1,136 @@
 # claude-tools
 
-Marketplace personale di plugin e skill per Claude Code (più le skill
-Claude.ai/Cowork, tenute qui solo come sorgente versionata).
+A small **plugin marketplace for [Claude Code](https://code.claude.com/docs/en/overview)** — a single
+repository that Claude Code reads directly, so installing anything from it takes two commands.
 
-Un solo repo, pensato per crescere: aggiungere un plugin significa aggiungere
-una cartella e una voce in `marketplace.json`, non un nuovo repository.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin%20marketplace-d97757.svg)](https://code.claude.com/docs/en/plugin-marketplaces)
 
-## Installazione
+The repository is built to grow: publishing a new plugin means adding a folder and one entry in
+[`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json), not creating a new repository.
+
+## Requirements
+
+- [Claude Code](https://code.claude.com/docs/en/quickstart) installed and authenticated (`claude --version`)
+- `git`
+
+## Installation
 
 ```bash
+# 1. Register this marketplace (once per machine)
 claude plugin marketplace add gitdozer/claude-tools
+
+# 2. Install any plugin listed below
+claude plugin install <plugin-name>@claude-tools
+
+# Example
 claude plugin install commit-desc@claude-tools
 ```
 
-`add` accetta anche il percorso locale della cartella che contiene
-`.claude-plugin/`, comodo per provare una modifica prima di pubblicarla.
+Check the result with `claude plugin list`. If the install output asks you to run `/reload-plugins`,
+run it inside your Claude Code session — otherwise the new plugin becomes available on the next
+session.
 
-## Cosa c'è
+`commit-desc@claude-tools` reads as `plugin@marketplace`: `claude-tools` is the marketplace
+identifier (the `name` field of `marketplace.json`), and it disambiguates plugins that share a name
+across marketplaces. Plain `claude plugin install commit-desc` works too, as long as no other
+registered marketplace offers a plugin by that name.
 
-| Plugin | Cartella | Cosa fa |
-| --- | --- | --- |
-| `commit-desc` | [`plugins/commit-desc`](plugins/commit-desc) | Propone un messaggio Conventional Commits per le modifiche in stage. |
+### Managing the installation
 
-## Struttura
+```bash
+claude plugin update commit-desc              # pull the latest published version
+claude plugin uninstall commit-desc           # remove the plugin, keep the marketplace
+claude plugin marketplace update claude-tools # refresh the index from GitHub
+claude plugin marketplace remove claude-tools # unregister the marketplace entirely
+```
+
+### A note on trust
+
+A Claude Code plugin can add skills, slash commands, subagents, hooks and MCP servers to your
+session, so treat installing one like installing any other executable code: only add marketplaces you
+trust. Everything in this repository is plain text you can read before installing.
+
+`commit-desc` runs read-only `git` commands (`git diff --cached`, `git log`, `git rev-parse`) and never creates a
+commit itself.
+
+## New to Claude Code plugins?
+
+Three terms are worth separating, because they are easy to confuse:
+
+| Term | What it is |
+| --- | --- |
+| **Skill** | A folder with a `SKILL.md` file: instructions Claude loads on demand, either because you invoke it (for instance by typing `/commit-desc`) or because the task matches its description. |
+| **Plugin** | The unit of installation. A plugin has a manifest (`.claude-plugin/plugin.json`) and can bundle skills, slash commands, subagents, hooks and MCP servers. |
+| **Marketplace** | An index (`.claude-plugin/marketplace.json`) listing plugins. You register the index once, then install plugins from it. This repository is one. |
+
+The practical consequence: **a marketplace lists plugins, never bare skills.** A skill always reaches
+you inside a plugin. Official documentation: [plugins](https://code.claude.com/docs/en/plugins),
+[marketplaces](https://code.claude.com/docs/en/plugin-marketplaces),
+[skills](https://code.claude.com/docs/en/skills).
+
+## Available plugins
+
+| Plugin | What it does |
+| --- | --- |
+| [`commit-desc`](plugins/commit-desc) | Proposes a [Conventional Commits](https://www.conventionalcommits.org/) message for your staged changes, then hands you the ready-to-run `git commit` line. |
+
+### commit-desc
+
+Stage what you want to commit, then ask for a message:
+
+```
+git add -p                     # or git add .
+/commit-desc                   # optionally: /commit-desc relates to issue #142
+```
+
+```
+The message:
+
+    feat(etl): add encoding parameter and safe loader
+
+Ready to run:
+
+    git commit -m "feat(etl): add encoding parameter and safe loader"
+```
+
+The plugin proposes, you decide: it never commits, and the text stays editable.
+
+It is designed around two constraints, an answer in a few seconds, and minimal token cost:
+
+- **Runs on Haiku with low reasoning effort.** Classifying a diff and writing one subject line does
+  not need a large model.
+- **Runs in a forked context**, so it pays for the diff only, not for the whole conversation it was
+  invoked from. In a long session that is the difference between a stable and reasonable cost and an unpredictable
+  one.
+- **Compresses the diff before the model sees it**: `--numstat` instead of `--stat`, two lines of
+  context instead of three, lock files / build output / notebooks / datasets / images listed but not
+  diffed, and a hard 12,000-character cap so an enormous commit stays fast (but keep in mind that you're losing context if you exceed the 12,000 chars).
+
+On a realistic commit that adds up to roughly 300–400 tokens of context per invocation.
+[plugins/commit-desc/README.md](plugins/commit-desc/README.md) documents the measurements, how to
+customize the message language and format, and the two bundled scripts — one reusable diff collector
+for git hooks and other tools, and one that measures, over your own commit history, exactly how much
+the skill would send.
+
+## Repository layout
 
 ```
 .
 ├── .claude-plugin/
-│   └── marketplace.json    unico indice: ogni voce di "plugins" è installabile
-├── plugins/                 plugin auto-contenuti, ognuno col proprio plugin.json
+│   └── marketplace.json   the only index: every entry in "plugins" is installable
+├── plugins/               self-contained plugins, each with its own plugin.json
 │   └── commit-desc/
-├── skills/                  (vuota) skill semplici senza manifest — pattern alternativo
-├── account-skills/          (vuota) skill Claude.ai/Cowork: fuori dal marketplace
-├── README.md
+├── skills/                (empty) reserved for manifest-less skills
+├── account-skills/        (empty) Claude.ai / Cowork skills: outside the marketplace
 ├── LICENSE
 ├── .gitignore
 └── .gitattributes
 ```
 
-## Come sono organizzate le cose
+Only what `marketplace.json` lists is reachable by `claude plugin install`; anything else in the
+repository is invisible to the CLI.
 
-Il **plugin è sempre l'unità di installazione**: un marketplace elenca plugin,
-non skill. Una skill raggiunge l'utente sempre *dentro* un plugin. Dalla
-documentazione ufficiale, i tre casi possibili:
+## License
 
-| Cosa hai | Cos'è |
-| --- | --- |
-| `<skills-dir>/foo/SKILL.md` senza manifest | una skill semplice, `foo` |
-| `<skills-dir>/foo/.claude-plugin/plugin.json` | un plugin `foo@skills-dir` |
-| `<plugin>/skills/bar/SKILL.md` | una skill `bar` impacchettata dentro un plugin |
-
-Il manifest di quel plugin può stare in due posti, e da lì i due pattern
-possibili — entrambi documentati, entrambi mescolabili nello stesso
-`marketplace.json`.
-
-### `plugins/` — la convenzione di questo repo
-
-Ogni plugin è auto-contenuto: `plugin.json` al suo interno, componenti
-auto-scoperti dalle cartelle `skills/`, `commands/`, `agents/`, `hooks/` e da
-`.mcp.json`. La voce nel marketplace si limita a puntarlo:
-
-```json
-{ "name": "commit-desc", "source": "./plugins/commit-desc" }
-```
-
-Vantaggi: metadati e versione in un posto solo (dentro il plugin, non duplicati
-nel marketplace), pacchetto estraibile in un repository indipendente senza
-modifiche, e spazio per crescere — aggiungere un comando o un hook è solo una
-cartella in più. È il pattern di
-[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official).
-Dettagli nel [README di `plugins/`](plugins/README.md).
-
-### `skills/` — pattern alternativo, oggi non usato
-
-Cartella con solo `SKILL.md`, nessun manifest: è la voce del marketplace a
-fare da manifest, con `source: "./"`, `strict: false` e l'elenco esplicito
-`skills: [...]`. È il pattern di
-[anthropics/skills](https://github.com/anthropics/skills), più leggero ma senza
-portabilità né metadati propri. Resta documentato nel
-[README di `skills/`](skills/README.md) per il caso in cui serva una skill
-davvero minima.
-
-### `account-skills/` — fuori dal marketplace
-
-Skill per Claude.ai/Cowork. Non compaiono in `marketplace.json` e non si
-installano con `claude plugin install`: si caricano nell'account come `SKILL.md`
-o zip `.skill`. Il repo le tiene solo versionate. Dettagli nel
-[README di `account-skills/`](account-skills/README.md).
-
-## Aggiungere un plugin
-
-1. Crea `plugins/nome-plugin/.claude-plugin/plugin.json` con i metadati (name,
-   version, description, author) e le cartelle dei componenti che ti servono.
-2. Aggiungi la voce in `.claude-plugin/marketplace.json`:
-   `{ "name": "nome-plugin", "source": "./plugins/nome-plugin" }`.
-3. Aggiungi la riga nella tabella *Cosa c'è*.
-
-## Pubblicare una modifica
-
-Il repository è pubblicato su
-[github.com/gitdozer/claude-tools](https://github.com/gitdozer/claude-tools).
-Da qui in avanti pubblicare è il normale ciclo git:
-
-```bash
-git add .
-git commit -m "..."
-git push
-```
-
-Tre nomi entrano in gioco, e sono indipendenti fra loro. Il repository si chiama
-`claude-tools` come la cartella locale, ma chi clona il repo può tenerlo in una
-cartella con qualunque nome e git non nota la differenza. Il terzo è il campo
-`name` di `marketplace.json`, allineato anch'esso a `claude-tools`: è
-l'identificatore che si digita dopo la chiocciola, come in `claude plugin
-install commit-desc@claude-tools`. Se un domani rinomini il repository, conviene
-aggiornare anche quello.
+[MIT](LICENSE) © Dennis Maffei
