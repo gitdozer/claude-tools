@@ -1,7 +1,7 @@
 # commit-desc
 
-Plugin per Claude Code: prima di ogni commit, genera una descrizione sintetica
-delle modifiche in stage nel formato **Conventional Commits** (in inglese).
+A Claude Code plugin: before you commit, it reads your staged changes and proposes a one-line
+description in the [Conventional Commits](https://www.conventionalcommits.org/) format.
 
 ```
 > /commit-desc
@@ -15,188 +15,171 @@ Ready to run:
     git commit -m "feat(etl): add encoding parameter and safe loader"
 ```
 
-## Come è fatto (e perché così)
+It proposes, you decide. The plugin never commits, and the text stays editable.
 
-Il vincolo del progetto è: risposta in pochi secondi e consumo di token minimo.
-Da qui tre scelte, tutte verificate con misurazioni:
+## Installation
 
-1. **`model: haiku` + `effort: low`.** Classificare un diff e scrivere una riga
-   non richiede un modello grande. Haiku con effort basso è il punto di
-   equilibrio migliore fra qualità e latenza.
-2. **`context: fork`.** Senza questo, lo slash command girerebbe *dentro* la
-   conversazione in corso: in una sessione lunga il costo dell'input sarebbe
-   quello di tutta la cronologia, non quello del diff. Con il fork la skill
-   parte in una finestra di contesto pulita e paga solo il diff. Nei test il
-   costo per invocazione è risultato circa 0,005–0,010 $ e stabile, contro
-   0,013–0,044 $ e molto variabile senza fork.
-3. **Il diff viene compresso prima di arrivare al modello.** Non serve l'intero
-   diff per capire *cosa* fa un commit:
-   - `--numstat` invece di `--stat`: l'istogramma ASCII di `--stat` costa molti
-     token e non aggiunge informazione;
-   - `-U2`: due righe di contesto invece di tre;
-   - lock file, output di build, notebook, dataset e immagini restano
-     nell'elenco dei file ma il loro contenuto non viene diffato;
-   - `head -c 12000`: tetto massimo, così un commit enorme resta veloce.
-
-   Su un commit realistico il contesto inviato è di circa 300–400 token; il
-   tetto massimo è di circa 3.500 token.
-
-Latenza misurata: 6–9 secondi in modalità headless, avvio della CLI incluso
-(~2–3 s). In una sessione interattiva già avviata resta solo il round-trip del
-modello.
-
-## Struttura
-
-```
-plugins/commit-desc/
-├── .claude-plugin/
-│   └── plugin.json                    manifest del plugin
-├── skills/
-│   └── commit-desc/
-│       ├── SKILL.md                   la skill: raccolta del diff + istruzioni al modello
-│       └── scripts/
-│           ├── collect_diff.sh        motore portabile per altri strumenti e git hook
-│           ├── measure_history.sh     misura quanto verrebbe inviato al modello, sui commit passati
-│           └── measure_history.ps1    la stessa misura in PowerShell, senza dipendere da Git Bash
-└── README.md
-```
-
-Il plugin è **auto-contenuto**: il manifest sta al suo interno e i componenti si
-auto-scoprono per convenzione (`skills/`, e se un giorno servissero anche
-`commands/`, `agents/`, `hooks/`, `.mcp.json`). Nessuno di questi va dichiarato
-in `plugin.json`, ed è il motivo per cui il manifest contiene solo metadati.
-
-Conseguenza pratica: questa cartella si può estrarre in un repository
-indipendente senza modificare nulla.
-
-## Installazione
-
-### Opzione A — marketplace (consigliata)
-
-Dalla radice del repo che contiene `.claude-plugin/marketplace.json`:
-
-```bash
-claude plugin marketplace add "C:/percorso/di/claude-tools"
-claude plugin install commit-desc@claude-tools
-```
-
-Il repo è pubblicato, quindi basta cambiare l'`add`:
+### Option A — from the marketplace (recommended)
 
 ```bash
 claude plugin marketplace add gitdozer/claude-tools
 claude plugin install commit-desc@claude-tools
 ```
 
-Stessa installazione, da qualunque macchina.
-
-### Opzione B — copia nella cartella skills
-
-Qualunque cartella dentro `~/.claude/skills/` che contenga un
-`.claude-plugin/plugin.json` viene caricata come plugin `nome@skills-dir`, senza
-marketplace e senza installazione. Basta quindi copiare **questa** cartella:
-
-```powershell
-Copy-Item -Recurse "<questa cartella>" "$env:USERPROFILE\.claude\skills\commit-desc"
-```
-
-Si carica alla sessione successiva come `commit-desc@skills-dir`, oppure subito
-con `/reload-plugins`. Verifica con `claude plugin list`.
-
-## Uso
-
-Metti in stage ciò che vuoi committare, poi:
-
-```
-git add -p          # o git add .
-/commit-desc
-/commit-desc riferito alla issue #142     # contesto opzionale
-```
-
-Il plugin non committa: propone il messaggio e la riga `git commit` pronta da
-incollare. Il testo resta sempre modificabile.
-
-## Personalizzazione
-
-Tutto si regola in `skills/commit-desc/SKILL.md`:
-
-| Cosa cambiare | Dove |
-| --- | --- |
-| Lingua del messaggio | sostituisci "in English" nella sezione *What to produce* |
-| Formato (es. subject + bullet) | sezione *Output format* |
-| Tipi ammessi, lunghezza massima | sezione *What to produce* |
-| File esclusi dal diff | i `':(exclude)...'` nel comando `git diff` |
-| Tetto di token | il valore di `head -c` |
-| Numero di commit recenti usati come riferimento di stile | `git log -5` |
-
-La versione va aggiornata in `.claude-plugin/plugin.json`, non nel
-`marketplace.json` di radice: con `strict` al valore di default il manifest del
-plugin è l'autorità sui metadati.
-
-## Due vincoli tecnici scoperti sul campo
-
-Utili se in futuro modifichi i comandi iniettati nella skill (`` !`...` ``):
-
-- **Il comando iniettato deve corrispondere a `allowed-tools`.** Se non
-  corrisponde viene bloccato dal sistema dei permessi e la skill **fallisce in
-  silenzio**: nessun output, nessun errore visibile. Le voci attuali sono
-  `Bash(git *), Bash(head *), Bash(wc *)`.
-- **Niente variabili di shell nel comando iniettato.** Un comando che contiene
-  `$VAR` (compreso `$CLAUDE_PLUGIN_ROOT`) viene rifiutato dallo stesso
-  meccanismo. È il motivo per cui i comandi `git` sono scritti direttamente in
-  `SKILL.md` invece di richiamare uno script tramite percorso.
-
-## Analizzare lo storico dei commit e calibrare il tetto di caratteri
-
-Lo stesso script serve anche solo per vedere, sulla repository che stai
-analizzando, che tipo di commit fai e quanto sono grandi i loro diff — non
-serve necessariamente voler cambiare il tetto (`head -c 12000`) per usarlo.
-Lo script va lanciato **dalla cartella del repository da misurare**, indicando
-il percorso completo dello script (che vive qui, non nel repository misurato).
-
-Con il plugin come sorgente (questo repository), da PowerShell:
-
-```powershell
-cd C:\percorso\del\repo
-& "C:\percorso\di\claude-tools\plugins\commit-desc\skills\commit-desc\scripts\measure_history.ps1" -Count 200
-```
-
-Da Git Bash o da qualsiasi shell POSIX:
+Same two commands on any machine. During development you can point `add` at a local working copy
+instead — any directory containing `.claude-plugin/marketplace.json`:
 
 ```bash
-cd /percorso/del/repo
-sh "/c/percorso/di/claude-tools/plugins/commit-desc/skills/commit-desc/scripts/measure_history.sh" 200
+claude plugin marketplace add "C:/path/to/claude-tools"
+claude plugin install commit-desc@claude-tools
 ```
 
-Se hai installato con l'Opzione B (copia in `~/.claude/skills/commit-desc`), il
-percorso diventa:
+### Option B — copy it into your skills directory
+
+Any directory under `~/.claude/skills/` that contains a `.claude-plugin/plugin.json` loads as
+`<name>@skills-dir`, with no marketplace and no install step. Copying **this** folder is enough:
 
 ```powershell
-cd C:\percorso\del\repo
+Copy-Item -Recurse "<this folder>" "$env:USERPROFILE\.claude\skills\commit-desc"
+```
+
+It loads on the next session as `commit-desc@skills-dir`, or immediately with `/reload-plugins`. Check
+with `claude plugin list`.
+
+## Usage
+
+Stage what you want to commit, then ask:
+
+```
+git add -p                                  # or git add .
+/commit-desc
+/commit-desc relates to issue #142          # optional extra context
+```
+
+The optional argument is free text: an issue number, the intent behind the change, anything that the
+diff alone does not show.
+
+## How it works, and why
+
+The design constraints are an answer in a few seconds and minimal token cost. Three decisions follow
+from them, each verified by measurement rather than assumed:
+
+1. **`model: haiku` with `effort: low`.** Classifying a diff and writing one line does not need a large
+   model. Haiku at low effort is the best balance of quality and latency for this job.
+
+2. **`context: fork`.** Without it, the skill would run *inside* your current conversation, so in a long
+   session the input cost would be the whole history rather than just the diff. Forking starts it in a
+   clean context window, where it pays for the diff only. Measured cost per invocation: roughly
+   **$0.005–0.010 and stable**, against **$0.013–0.044 and highly variable** without the fork.
+
+3. **The diff is compressed before the model sees it.** You do not need a complete diff to understand
+   *what* a commit does:
+   - `--numstat` instead of `--stat` — the ASCII histogram costs many tokens and adds no information;
+   - `-U2` — two lines of context instead of three;
+   - lock files, build output, notebooks, datasets and images stay in the file list, but their content
+     is not diffed;
+   - `head -c 12000` — a hard ceiling, so an enormous commit stays fast.
+
+   On a realistic commit the context sent is about **300–400 tokens**; the ceiling is about **3,500
+   tokens**.
+
+Measured latency: **6–9 seconds** in headless mode, CLI startup included (~2–3 s of that). Inside an
+already-running interactive session, only the model round-trip remains.
+
+When the diff does exceed the cap, the model is instructed to say so in its answer before the message,
+so a proposal based on partial information never looks complete.
+
+## Customization
+
+Everything is tuned in [`skills/commit-desc/SKILL.md`](skills/commit-desc/SKILL.md):
+
+| What to change | Where |
+| --- | --- |
+| Language of the message | replace "in English" in the *What to produce* section, and the truncation warning in *Output format* — that one is a separate literal string |
+| Format (e.g. subject + bullets) | the *Output format* section |
+| Allowed types, maximum length | the *What to produce* section |
+| Files excluded from the diff | the `':(exclude)...'` pathspecs in the `git diff` command |
+| Character cap | the `head -c` value |
+| How many recent commits are used as a style reference | `git log -5` |
+
+Bump `version` in [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json), not in the root
+`marketplace.json`: with `strict` at its default the plugin manifest is the authority for metadata, and
+Claude Code uses that `version` to decide whether an update is available.
+
+Note that the character cap appears in more than one place inside `SKILL.md` — the prose, the
+`head -c`, and the truncation check — plus as the `COMMIT_DESC_MAX_CHARS` default in the scripts. Change
+one, change all.
+
+## Structure
+
+```
+plugins/commit-desc/
+├── .claude-plugin/
+│   └── plugin.json                    the plugin manifest
+├── skills/
+│   └── commit-desc/
+│       ├── SKILL.md                   the skill: diff collection + instructions to the model
+│       └── scripts/
+│           ├── collect_diff.sh        portable engine for other tools and git hooks
+│           ├── measure_history.sh     measures what would be sent to the model, over past commits
+│           └── measure_history.ps1    the same measurement in PowerShell, without needing Git Bash
+└── README.md
+```
+
+The plugin is **self-contained**: the manifest lives inside it, and components are auto-discovered by
+convention (`skills/`, and if ever needed `commands/`, `agents/`, `hooks/`, `.mcp.json`). None of them
+belongs in `plugin.json`, which is why the manifest holds metadata only.
+
+The practical consequence: this folder can be extracted into a standalone repository without changing
+anything.
+
+## Inspecting your own history and calibrating the cap
+
+The measurement scripts answer the only question that matters when tuning the cap: *on my commits, how
+often would it actually bite?* They are also useful just to see what your commits look like — you do
+not have to want to change `head -c 12000` to run them.
+
+Run them **from the repository you want to measure**, giving the full path to the script (which lives
+here, not in the repository being measured):
+
+```powershell
+cd C:\path\to\the\repo
+& "C:\path\to\claude-tools\plugins\commit-desc\skills\commit-desc\scripts\measure_history.ps1" -Count 200
+```
+
+```bash
+cd /path/to/the/repo
+sh "/c/path/to/claude-tools/plugins/commit-desc/skills/commit-desc/scripts/measure_history.sh" 200
+```
+
+If you installed with Option B, the path becomes:
+
+```powershell
 & "$env:USERPROFILE\.claude\skills\commit-desc\skills\commit-desc\scripts\measure_history.ps1" -Count 200
 ```
 
 ```bash
-cd /percorso/del/repo
 sh "$HOME/.claude/skills/commit-desc/skills/commit-desc/scripts/measure_history.sh" 200
 ```
 
-(il doppio `commit-desc` non è un errore: il primo è la cartella del plugin, il
-secondo quella della skill al suo interno)
+(the doubled `commit-desc` is not a typo: the first is the plugin directory, the second the skill inside
+it)
 
-Le due versioni (PowerShell e POSIX) danno gli stessi numeri, byte per byte:
-mediana, 90° percentile, massimo, quanti commit avrebbero superato il tetto e
-quali. L'unità di misura è il byte, la stessa di `head -c` nella skill — la
-versione PowerShell conta lo stdout grezzo di git, non le stringhe decodificate,
-altrimenti accenti e CRLF la farebbero divergere da `wc -c`. Confrontano anche
-il diff grezzo con quello effettivamente inviato, per quantificare quanto stanno
-rendendo le esclusioni.
+Both versions report the same numbers in the same layout: median, 90th percentile, maximum, how many
+commits would have exceeded the cap and which ones. They also compare the raw diff against what is
+actually sent, which quantifies how much the exclusions are earning you.
 
-Se `git` fallisce su un commit — un oggetto illeggibile, per esempio — quel
-commit viene elencato a parte ed escluso dalle statistiche, invece di entrarci
-come zero: uno zero silenzioso abbasserebbe mediana e percentili dando numeri
-plausibili ma sbagliati, proprio quelli su cui si decide il tetto.
+The unit is the byte, the same as `head -c` in the skill. Two details keep the two implementations from
+drifting apart: the PowerShell version counts git's raw stdout rather than decoded strings — otherwise
+accented characters and CRLF would make it diverge from `wc -c` — and it formats numbers with the
+invariant culture, since PowerShell's `N0` follows the machine's locale and would print `12.000` where
+the POSIX version prints `12,000`.
 
-Per provare un tetto diverso senza toccare `SKILL.md`:
+If git fails on a commit — an unreadable object, say — that commit is listed separately and left out of
+the statistics instead of counting as zero. A silent zero would drag the median and the percentiles
+down, producing plausible but wrong numbers, which are exactly the numbers the cap is chosen from.
+
+To try a different cap without touching `SKILL.md`:
 
 ```powershell
 & "...\measure_history.ps1" -Count 200 -Cap 24000
@@ -206,37 +189,53 @@ Per provare un tetto diverso senza toccare `SKILL.md`:
 COMMIT_DESC_MAX_CHARS=24000 sh ".../measure_history.sh" 200
 ```
 
-Se PowerShell risponde `Impossibile caricare il file ... perché l'esecuzione di
-script è disattivata`, sbloccalo per la sola sessione corrente:
+Defaults: `-Count`/`[number of commits]` is 100, `-Cap`/`COMMIT_DESC_MAX_CHARS` is 12000, context lines
+are 2. Merge commits are skipped, since `git show` prints no diff for them by default and they would
+show up as zero.
+
+If PowerShell refuses to run the script because running scripts is disabled on this system, unblock it
+for the current session only:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-Regola pratica: se la mediana è molto sotto il tetto e i pochi commit che lo
-superano sono modifiche massive e meccaniche (rinomine, changelog, file
-rigenerati), il tetto va bene così — su quei commit un messaggio generico è
-comunque corretto.
+Rule of thumb for reading the output: if the median is well below the cap and the few commits that
+exceed it are massive mechanical changes (renames, changelogs, regenerated files), the cap is fine as
+it is — a generic message is the right answer for those commits anyway.
 
-## Portabilità verso altri strumenti
+## Reusing the diff collector in other tools
 
-`skills/commit-desc/scripts/collect_diff.sh` è il motore riutilizzabile:
-raccoglie e comprime le modifiche in stage (stessa logica della skill, più un
-tetto per singolo file e la gestione del caso "niente in stage") e non dipende
-da Claude Code. È scritto in POSIX sh + awk, quindi funziona anche in Git Bash
-su Windows.
+[`skills/commit-desc/scripts/collect_diff.sh`](skills/commit-desc/scripts/collect_diff.sh) is the
+reusable engine: it collects and compresses the staged changes with the same logic as the skill, plus a
+per-file ceiling and handling for the "nothing staged" case, and it does not depend on Claude Code. It
+is POSIX `sh` + `awk`, so it also runs under Git Bash on Windows.
 
-Uso da terminale, con qualsiasi strumento capace di leggere stdin:
+From a terminal, with any tool that can read stdin:
 
 ```bash
 sh skills/commit-desc/scripts/collect_diff.sh | claude -p --model haiku \
   'Reply with ONE Conventional Commits subject line for the staged changes below. Output only that line.'
 ```
 
-Questa strada paga però l'avvio a freddo della CLI (~13 s misurati), quindi
-serve come base per un **git hook `prepare-commit-msg`** o per l'integrazione
-con Codex e strumenti simili, non come sostituto della skill in sessione.
+This route pays the CLI cold start (~13 s measured), so treat it as the basis for a
+`prepare-commit-msg` **git hook**, or for integrating with Codex and similar tools — not as a
+replacement for the skill inside a session.
 
-Parametri via variabili d'ambiente: `COMMIT_DESC_MAX_CHARS` (default 12000),
-`COMMIT_DESC_MAX_FILE_CHARS` (2000), `COMMIT_DESC_CONTEXT` (2),
-`COMMIT_DESC_LOG_COUNT` (5).
+Parameters come from environment variables: `COMMIT_DESC_MAX_CHARS` (default 12000),
+`COMMIT_DESC_MAX_FILE_CHARS` (2000), `COMMIT_DESC_CONTEXT` (2), `COMMIT_DESC_LOG_COUNT` (5).
+
+## Two constraints discovered on the field
+
+Useful if you ever change the commands injected into the skill with `` !`...` ``:
+
+- **The injected command must match `allowed-tools`.** If it does not, the permission system blocks it
+  and the skill **fails silently**: no output, no visible error. The current entries are
+  `Bash(git *), Bash(head *), Bash(wc *)`.
+- **No shell variables in an injected command.** A command containing `$VAR` — including
+  `$CLAUDE_PLUGIN_ROOT` — is rejected by the same mechanism. That is why the `git` commands are written
+  out in `SKILL.md` instead of calling a script by path.
+
+## License
+
+[MIT](../../LICENSE) © Dennis Maffei
