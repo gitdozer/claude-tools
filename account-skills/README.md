@@ -3,7 +3,7 @@
 Skills for **claude.ai and Cowork** — not for the Claude Code CLI. Writing skills, document
 generation, or anything meant to be used in a chat rather than from a terminal.
 
-**The folder is currently empty.** 
+**Empty for now** — no claude.ai or Cowork skill has been written yet.
 
 ## How these differ from `skills/` and `plugins/`
 
