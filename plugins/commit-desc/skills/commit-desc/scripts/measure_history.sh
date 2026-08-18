@@ -15,6 +15,11 @@
 # Merge commits are skipped: `git show` prints no diff for them by default, so
 # they would show up as 0 and distort the statistics.
 #
+# For the same reason a commit git fails on is listed and left out of the
+# statistics rather than counted as 0: piping git straight into `wc -c` hid its
+# exit status, so a failure was indistinguishable from an empty diff and pulled
+# the median and the percentiles down -- exactly the numbers the cap is set from.
+#
 # Environment overrides:
 #   COMMIT_DESC_MAX_CHARS   the cap to compare against (default 12000)
 #   COMMIT_DESC_CONTEXT     context lines used for SENT (default 2)
@@ -63,11 +68,24 @@ set -- \
   ':(exclude)node_modules/*'
 
 TMP=$(mktemp) || exit 1
-trap 'rm -f "$TMP"' EXIT INT TERM
+OUT=$(mktemp) || exit 1
+OK=$(mktemp) || exit 1
+trap 'rm -f "$TMP" "$OUT" "$OK"' EXIT INT TERM
 
+# git writes to $OUT and its exit status is checked before measuring, so a
+# failure becomes the literal ERR instead of a plausible-looking 0. Measuring the
+# file (not a pipe) keeps the count byte-exact, same as the previous `| wc -c`.
 git log -n "$N" --no-merges --pretty=%H 2>/dev/null | while read -r sha; do
-  raw=$(git show --no-color --no-ext-diff --format= -M "$sha" 2>/dev/null | wc -c)
-  sent=$(git show --no-color --no-ext-diff --diff-algorithm=minimal "-U$CTX" --format= -M "$sha" -- . "$@" 2>/dev/null | wc -c)
+  if git show --no-color --no-ext-diff --format= -M "$sha" >"$OUT" 2>/dev/null; then
+    raw=$(wc -c <"$OUT" | tr -d ' \t')
+  else
+    raw=ERR
+  fi
+  if git show --no-color --no-ext-diff --diff-algorithm=minimal "-U$CTX" --format= -M "$sha" -- . "$@" >"$OUT" 2>/dev/null; then
+    sent=$(wc -c <"$OUT" | tr -d ' \t')
+  else
+    sent=ERR
+  fi
   subj=$(git log -1 --pretty=%s "$sha" 2>/dev/null)
   printf '%s\t%s\t%s\t%s\n' "$raw" "$sent" "$(echo "$sha" | cut -c1-8)" "$subj"
 done > "$TMP"
@@ -77,7 +95,17 @@ if [ ! -s "$TMP" ]; then
   exit 0
 fi
 
-sort -t"$(printf '\t')" -k2,2n "$TMP" | awk -F'\t' -v cap="$CAP" -v ctx="$CTX" '
+# Split measurable commits from failed ones: keeping ERR rows in the sort would
+# make them count as 0 again.
+awk -F'\t' '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/' "$TMP" > "$OK"
+nfail=$(awk -F'\t' '!($1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/)' "$TMP" | wc -l | tr -d ' \t')
+
+if [ ! -s "$OK" ]; then
+  echo "ERROR: git produced no measurable diff for any of the commits analysed." >&2
+  exit 1
+fi
+
+sort -t"$(printf '\t')" -k2,2n "$OK" | awk -F'\t' -v cap="$CAP" -v ctx="$CTX" '
 function fmt(x) { s = sprintf("%d", x + 0); out = ""; while (length(s) > 3) { out = "." substr(s, length(s) - 2) out; s = substr(s, 1, length(s) - 3) } return s out }
 { raw[NR] = $1; sent[NR] = $2; sha[NR] = $3; subj[NR] = $4; rawsum += $1; sentsum += $2; if ($2 > cap) over++ }
 END {
@@ -103,3 +131,8 @@ END {
   if (over > 0) printf "\n* superano il tetto: il diff sarebbe stato troncato.\n"
 }
 '
+
+if [ "$nfail" -gt 0 ]; then
+  printf '\nATTENZIONE: git non ha prodotto un diff misurabile per %s commit. Sono esclusi dalle statistiche qui sopra:\n' "$nfail"
+  awk -F'\t' '!($1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/) { printf "  %s  %s\n", $3, $4 }' "$TMP"
+fi

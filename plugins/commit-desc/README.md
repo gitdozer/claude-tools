@@ -183,10 +183,18 @@ sh "$HOME/.claude/skills/commit-desc/skills/commit-desc/scripts/measure_history.
 (il doppio `commit-desc` non è un errore: il primo è la cartella del plugin, il
 secondo quella della skill al suo interno)
 
-Le due versioni (PowerShell e POSIX) sono equivalenti e danno gli stessi
-numeri: mediana, 90° percentile, massimo, quanti commit avrebbero superato il
-tetto e quali. Confrontano anche il diff grezzo con quello effettivamente
-inviato, per quantificare quanto stanno rendendo le esclusioni.
+Le due versioni (PowerShell e POSIX) danno gli stessi numeri, byte per byte:
+mediana, 90° percentile, massimo, quanti commit avrebbero superato il tetto e
+quali. L'unità di misura è il byte, la stessa di `head -c` nella skill — la
+versione PowerShell conta lo stdout grezzo di git, non le stringhe decodificate,
+altrimenti accenti e CRLF la farebbero divergere da `wc -c`. Confrontano anche
+il diff grezzo con quello effettivamente inviato, per quantificare quanto stanno
+rendendo le esclusioni.
+
+Se `git` fallisce su un commit — un oggetto illeggibile, per esempio — quel
+commit viene elencato a parte ed escluso dalle statistiche, invece di entrarci
+come zero: uno zero silenzioso abbasserebbe mediana e percentili dando numeri
+plausibili ma sbagliati, proprio quelli su cui si decide il tetto.
 
 Per provare un tetto diverso senza toccare `SKILL.md`:
 
