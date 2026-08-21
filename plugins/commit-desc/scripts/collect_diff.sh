@@ -13,7 +13,7 @@
 # including Git Bash on Windows, with no interpreter-name ambiguity.
 #
 # Environment overrides:
-#   COMMIT_DESC_MAX_CHARS       total budget for the diff body (default 12000)
+#   COMMIT_DESC_MAX_CHARS       total budget for the diff body (default 20000)
 #   COMMIT_DESC_MAX_FILE_CHARS  per-file budget for the diff body (default 2000)
 #   COMMIT_DESC_CONTEXT         diff context lines (default 2)
 #   COMMIT_DESC_LOG_COUNT       recent commit subjects to include (default 5)
@@ -21,7 +21,7 @@
 # Always exits 0: the caller is a prompt, not a build step, so problems must
 # come back as readable text instead of an empty injection.
 
-MAXT=${COMMIT_DESC_MAX_CHARS:-12000}
+MAXT=${COMMIT_DESC_MAX_CHARS:-20000}
 MAXF=${COMMIT_DESC_MAX_FILE_CHARS:-2000}
 CTX=${COMMIT_DESC_CONTEXT:-2}
 LOGN=${COMMIT_DESC_LOG_COUNT:-5}

@@ -78,10 +78,12 @@ from them, each verified by measurement rather than assumed:
    - `-U2` — two lines of context instead of three;
    - lock files, build output, notebooks, datasets and images stay in the file list, but their content
      is not diffed;
-   - `head -c 12000` — a hard ceiling, so an enormous commit stays fast.
+   - `head -c 20000` — a hard ceiling, so an enormous commit stays fast.
 
-   On a realistic commit the context sent is about **300–400 tokens**; the ceiling is about **3,500
-   tokens**.
+   The diff sent on a median commit is about **450–650 tokens** (measured across two repositories:
+   ~1,800 and ~2,500 characters); the ceiling is about **5,000 tokens**. Because `head -c` is a
+   ceiling and not a floor, raising it costs nothing on a typical commit — only the commits that
+   would otherwise be truncated send more.
 
 Measured latency: **6–9 seconds** in headless mode, CLI startup included (~2–3 s of that). Inside an
 already-running interactive session, only the model round-trip remains.
@@ -144,7 +146,7 @@ anything.
 
 The measurement scripts answer the only question that matters when tuning the cap: *on my commits, how
 often would it actually bite?* They are also useful just to see what your commits look like — you do
-not have to want to change `head -c 12000` to run them.
+not have to want to change `head -c 20000` to run them.
 
 Run them **from the repository you want to measure**, giving the full path to the script (which lives
 here, not in the repository being measured):
@@ -176,8 +178,8 @@ actually sent, which quantifies how much the exclusions are earning you.
 The unit is the byte, the same as `head -c` in the skill. Two details keep the two implementations from
 drifting apart: the PowerShell version counts git's raw stdout rather than decoded strings — otherwise
 accented characters and CRLF would make it diverge from `wc -c` — and it formats numbers with the
-invariant culture, since PowerShell's `N0` follows the machine's locale and would print `12.000` where
-the POSIX version prints `12,000`.
+invariant culture, since PowerShell's `N0` follows the machine's locale and would print `20.000` where
+the POSIX version prints `20,000`.
 
 If git fails on a commit — an unreadable object, say — that commit is listed separately and left out of
 the statistics instead of counting as zero. A silent zero would drag the median and the percentiles
@@ -193,7 +195,7 @@ To try a different cap without touching `SKILL.md`:
 COMMIT_DESC_MAX_CHARS=24000 sh ".../measure_history.sh" 200
 ```
 
-Defaults: `-Count`/`[number of commits]` is 100, `-Cap`/`COMMIT_DESC_MAX_CHARS` is 12000, context lines
+Defaults: `-Count`/`[number of commits]` is 100, `-Cap`/`COMMIT_DESC_MAX_CHARS` is 20000, context lines
 are 2. Merge commits are skipped, since `git show` prints no diff for them by default and they would
 show up as zero.
 
@@ -207,6 +209,13 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 Rule of thumb for reading the output: if the median is well below the cap and the few commits that
 exceed it are massive mechanical changes (renames, changelogs, regenerated files), the cap is fine as
 it is — a generic message is the right answer for those commits anyway.
+
+The number to set the cap from is the **90th percentile**, not the maximum: put the cap just above it
+and truncation is pushed back into the tail, where it belongs. That is how the current 20,000 was
+chosen — on a 200-commit application repository the 90th percentile came out at 17,082, with the cap
+at 12,000 truncating 28 commits out of 200 (14%) and at 20,000 truncating 18 (9%). Chasing the
+maximum instead is not worth it: the commits above 20,000 there were 50–95 KB planning documents,
+where a truncated diff and a generic message are the correct outcome.
 
 ## Reusing the diff collector in other tools
 
@@ -226,7 +235,7 @@ This route pays the CLI cold start (~13 s measured), so treat it as the basis fo
 `prepare-commit-msg` **git hook**, or for integrating with Codex and similar tools — not as a
 replacement for the skill inside a session.
 
-Parameters come from environment variables: `COMMIT_DESC_MAX_CHARS` (default 12000),
+Parameters come from environment variables: `COMMIT_DESC_MAX_CHARS` (default 20000),
 `COMMIT_DESC_MAX_FILE_CHARS` (2000), `COMMIT_DESC_CONTEXT` (2), `COMMIT_DESC_LOG_COUNT` (5).
 
 ## Two constraints discovered on the field

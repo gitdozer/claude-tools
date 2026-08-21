@@ -105,9 +105,9 @@ It is designed around two constraints, an answer in a few seconds, and minimal t
   one.
 - **Compresses the diff before the model sees it**: `--numstat` instead of `--stat`, two lines of
   context instead of three, lock files / build output / notebooks / datasets / images listed but not
-  diffed, and a hard 12,000-character cap so an enormous commit stays fast (but keep in mind that you're losing context if you exceed the 12,000 chars).
+  diffed, and a hard 20,000-character cap so an enormous commit stays fast (but keep in mind that you're losing context if you exceed the 20,000 chars).
 
-On a realistic commit that adds up to roughly 300–400 tokens of context per invocation.
+On a median commit that adds up to roughly 450–650 tokens of context per invocation.
 [plugins/commit-desc/README.md](plugins/commit-desc/README.md) documents the measurements, how to
 customize the message language and format, and the two bundled scripts — one reusable diff collector
 for git hooks and other tools, and one that measures, over your own commit history, exactly how much

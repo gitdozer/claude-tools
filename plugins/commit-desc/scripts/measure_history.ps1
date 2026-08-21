@@ -31,7 +31,7 @@
     How many commits to analyse, starting from HEAD. Default 100.
 
 .PARAMETER Cap
-    The cap to compare the measurements against. Default 12000, as in SKILL.md.
+    The cap to compare the measurements against. Default 20000, as in SKILL.md.
 
 .PARAMETER ContextLines
     Context lines used for the "Sent" measurement. Default 2, as in SKILL.md.
@@ -45,7 +45,7 @@
 [CmdletBinding()]
 param(
     [int]$Count = 100,
-    [int]$Cap = 12000,
+    [int]$Cap = 20000,
     [int]$ContextLines = 2
 )
 
@@ -53,7 +53,7 @@ $ErrorActionPreference = 'Stop'
 
 # Numbers are formatted with the invariant culture on purpose: PowerShell's `N0`
 # follows the machine's locale, so on a non-English Windows the same value would
-# print as 12.000 here and 12,000 in measure_history.sh. Forcing the culture keeps
+# print as 20.000 here and 20,000 in measure_history.sh. Forcing the culture keeps
 # the two versions comparable line by line.
 function Format-Number {
     param([double]$Value)

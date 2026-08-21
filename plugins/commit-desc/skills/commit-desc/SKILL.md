@@ -22,11 +22,11 @@ RECENT COMMIT SUBJECTS (match this repository's existing style):
 STAGED FILES (added/deleted line counts; `-` means git treats the file as binary):
 !`git diff --cached --numstat -M`
 
-DIFF SIZE in characters, measured before the 12000-character cap is applied:
+DIFF SIZE in characters, measured before the 20000-character cap is applied:
 !`git diff --cached -M -U2 --no-color --no-ext-diff --diff-algorithm=minimal -- . ':(exclude)*.lock' ':(exclude)*-lock.json' ':(exclude)*.lockb' ':(exclude)pnpm-lock.yaml' ':(exclude)*.min.js' ':(exclude)*.min.css' ':(exclude)*.map' ':(exclude)*.snap' ':(exclude)*.ipynb' ':(exclude)*.csv' ':(exclude)*.tsv' ':(exclude)*.parquet' ':(exclude)*.xlsx' ':(exclude)*.geojson' ':(exclude)*.pdf' ':(exclude)*.svg' ':(exclude)*.png' ':(exclude)*.jpg' ':(exclude)*.jpeg' ':(exclude)*.gif' ':(exclude)*.ico' ':(exclude)*.pkl' ':(exclude)*.h5' ':(exclude)*.onnx' ':(exclude)*.zip' ':(exclude)dist/*' ':(exclude)*/dist/*' ':(exclude)build/*' ':(exclude)*/build/*' ':(exclude)node_modules/*' | wc -c`
 
 DIFF (2 lines of context; lock files, build output, notebooks, data files and images are listed above but not diffed here):
-!`git diff --cached -M -U2 --no-color --no-ext-diff --diff-algorithm=minimal -- . ':(exclude)*.lock' ':(exclude)*-lock.json' ':(exclude)*.lockb' ':(exclude)pnpm-lock.yaml' ':(exclude)*.min.js' ':(exclude)*.min.css' ':(exclude)*.map' ':(exclude)*.snap' ':(exclude)*.ipynb' ':(exclude)*.csv' ':(exclude)*.tsv' ':(exclude)*.parquet' ':(exclude)*.xlsx' ':(exclude)*.geojson' ':(exclude)*.pdf' ':(exclude)*.svg' ':(exclude)*.png' ':(exclude)*.jpg' ':(exclude)*.jpeg' ':(exclude)*.gif' ':(exclude)*.ico' ':(exclude)*.pkl' ':(exclude)*.h5' ':(exclude)*.onnx' ':(exclude)*.zip' ':(exclude)dist/*' ':(exclude)*/dist/*' ':(exclude)build/*' ':(exclude)*/build/*' ':(exclude)node_modules/*' | head -c 12000`
+!`git diff --cached -M -U2 --no-color --no-ext-diff --diff-algorithm=minimal -- . ':(exclude)*.lock' ':(exclude)*-lock.json' ':(exclude)*.lockb' ':(exclude)pnpm-lock.yaml' ':(exclude)*.min.js' ':(exclude)*.min.css' ':(exclude)*.map' ':(exclude)*.snap' ':(exclude)*.ipynb' ':(exclude)*.csv' ':(exclude)*.tsv' ':(exclude)*.parquet' ':(exclude)*.xlsx' ':(exclude)*.geojson' ':(exclude)*.pdf' ':(exclude)*.svg' ':(exclude)*.png' ':(exclude)*.jpg' ':(exclude)*.jpeg' ':(exclude)*.gif' ':(exclude)*.ico' ':(exclude)*.pkl' ':(exclude)*.h5' ':(exclude)*.onnx' ':(exclude)*.zip' ':(exclude)dist/*' ':(exclude)*/dist/*' ':(exclude)build/*' ':(exclude)*/build/*' ':(exclude)node_modules/*' | head -c 20000`
 
 Extra context from the user (may be empty): $ARGUMENTS
 
@@ -69,14 +69,14 @@ Rules:
 Reply with **only** the blocks below: no preamble, no explanation, no
 alternatives, no follow-up question.
 
-**Truncation warning — do this first.** Compare DIFF SIZE with 12000. If DIFF
-SIZE is greater than 12000, the diff you received is incomplete, and the very
+**Truncation warning — do this first.** Compare DIFF SIZE with 20000. If DIFF
+SIZE is greater than 20000, the diff you received is incomplete, and the very
 first line of your reply must be exactly this, with the real number in place of
 N and no other comment:
 
-    WARNING: diff truncated, 12,000 characters sent out of N. The message is based on part of the changes.
+    WARNING: diff truncated, 20,000 characters sent out of N. The message is based on part of the changes.
 
-If DIFF SIZE is 12000 or less, do not mention truncation at all.
+If DIFF SIZE is 20000 or less, do not mention truncation at all.
 
 Then, in both cases:
 

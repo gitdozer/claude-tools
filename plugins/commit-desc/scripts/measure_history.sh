@@ -21,11 +21,11 @@
 # the median and the percentiles down -- exactly the numbers the cap is set from.
 #
 # Environment overrides:
-#   COMMIT_DESC_MAX_CHARS   the cap to compare against (default 12000)
+#   COMMIT_DESC_MAX_CHARS   the cap to compare against (default 20000)
 #   COMMIT_DESC_CONTEXT     context lines used for SENT (default 2)
 
 N=${1:-100}
-CAP=${COMMIT_DESC_MAX_CHARS:-12000}
+CAP=${COMMIT_DESC_MAX_CHARS:-20000}
 CTX=${COMMIT_DESC_CONTEXT:-2}
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
