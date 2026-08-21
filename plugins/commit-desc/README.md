@@ -118,17 +118,24 @@ plugins/commit-desc/
 │   └── plugin.json                    the plugin manifest
 ├── skills/
 │   └── commit-desc/
-│       ├── SKILL.md                   the skill: diff collection + instructions to the model
-│       └── scripts/
-│           ├── collect_diff.sh        portable engine for other tools and git hooks
-│           ├── measure_history.sh     measures what would be sent to the model, over past commits
-│           └── measure_history.ps1    the same measurement in PowerShell, without needing Git Bash
+│       └── SKILL.md                   the skill — the whole execution path lives here
+├── scripts/                           companion tooling, NOT on the execution path
+│   ├── collect_diff.sh                portable engine for other tools and git hooks
+│   ├── measure_history.sh             measures what would be sent to the model, over past commits
+│   └── measure_history.ps1            the same measurement in PowerShell, without needing Git Bash
 └── README.md
 ```
 
+`SKILL.md` is the entire plugin at run time: it inlines its own `git` commands and calls nothing in
+`scripts/`. That directory holds tools you run yourself — a git hook, another CLI, a calibration pass —
+and it sits at the plugin root because that is where the
+[plugin reference](https://code.claude.com/docs/en/plugins-reference) puts bundled helper scripts.
+Keeping it inside `skills/` implied the skill executed it, which it never did.
+
 The plugin is **self-contained**: the manifest lives inside it, and components are auto-discovered by
 convention (`skills/`, and if ever needed `commands/`, `agents/`, `hooks/`, `.mcp.json`). None of them
-belongs in `plugin.json`, which is why the manifest holds metadata only.
+belongs in `plugin.json`, which is why the manifest holds metadata only. `scripts/` is not a component
+directory, so Claude Code ships it without interpreting it.
 
 The practical consequence: this folder can be extracted into a standalone repository without changing
 anything.
@@ -144,26 +151,23 @@ here, not in the repository being measured):
 
 ```powershell
 cd C:\path\to\the\repo
-& "C:\path\to\claude-tools\plugins\commit-desc\skills\commit-desc\scripts\measure_history.ps1" -Count 200
+& "C:\path\to\claude-tools\plugins\commit-desc\scripts\measure_history.ps1" -Count 200
 ```
 
 ```bash
 cd /path/to/the/repo
-sh "/c/path/to/claude-tools/plugins/commit-desc/skills/commit-desc/scripts/measure_history.sh" 200
+sh "/c/path/to/claude-tools/plugins/commit-desc/scripts/measure_history.sh" 200
 ```
 
 If you installed with Option B, the path becomes:
 
 ```powershell
-& "$env:USERPROFILE\.claude\skills\commit-desc\skills\commit-desc\scripts\measure_history.ps1" -Count 200
+& "$env:USERPROFILE\.claude\skills\commit-desc\scripts\measure_history.ps1" -Count 200
 ```
 
 ```bash
-sh "$HOME/.claude/skills/commit-desc/skills/commit-desc/scripts/measure_history.sh" 200
+sh "$HOME/.claude/skills/commit-desc/scripts/measure_history.sh" 200
 ```
-
-(the doubled `commit-desc` is not a typo: the first is the plugin directory, the second the skill inside
-it)
 
 Both versions report the same numbers in the same layout: median, 90th percentile, maximum, how many
 commits would have exceeded the cap and which ones. They also compare the raw diff against what is
@@ -206,7 +210,7 @@ it is — a generic message is the right answer for those commits anyway.
 
 ## Reusing the diff collector in other tools
 
-[`skills/commit-desc/scripts/collect_diff.sh`](skills/commit-desc/scripts/collect_diff.sh) is the
+[`scripts/collect_diff.sh`](scripts/collect_diff.sh) is the
 reusable engine: it collects and compresses the staged changes with the same logic as the skill, plus a
 per-file ceiling and handling for the "nothing staged" case, and it does not depend on Claude Code. It
 is POSIX `sh` + `awk`, so it also runs under Git Bash on Windows.
@@ -214,7 +218,7 @@ is POSIX `sh` + `awk`, so it also runs under Git Bash on Windows.
 From a terminal, with any tool that can read stdin:
 
 ```bash
-sh skills/commit-desc/scripts/collect_diff.sh | claude -p --model haiku \
+sh scripts/collect_diff.sh | claude -p --model haiku \
   'Reply with ONE Conventional Commits subject line for the staged changes below. Output only that line.'
 ```
 
