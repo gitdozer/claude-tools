@@ -97,7 +97,7 @@ awk -v maxt="$MAXT" -v maxf="$MAXF" '
   /^diff --git / { fchars = 0; fskip = 0 }
   {
     n = length($0) + 1
-    if (total + n > maxt) {
+    if (capped || total + n > maxt) {
       if (!capped) { print "... [diff truncated: total budget reached, judge the rest from the file table above]"; capped = 1 }
       next
     }
